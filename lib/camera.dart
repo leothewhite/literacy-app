@@ -10,10 +10,14 @@ import 'package:easy_rich_text/easy_rich_text.dart';
 bool _loading = true;
 String? _showing;
 bool _taken = false;
+int _today = 0;
+int _date = 0;
+List resp = ["에러: 로딩이 되지 않았습니다.", "에러: 로딩이 되지 않았습니다."];
 
-const List<String> list = <String>['요약', '하이라이트 표시'];
+const List<String> list = <String>['요약', '원문', '한 줄 요약'];
 
-List<String> bold_list = [];
+Map foring = {'요약': 0, '원문': 1, '한 줄 요약': 2};
+
 
 String? dropdownValue = list.first;
 
@@ -51,6 +55,8 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
 
+
+
   @override
   void initState() {
     super.initState();
@@ -67,10 +73,9 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     _controller.dispose();
     super.dispose();
   }
-
-
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(title: const Text('Take a picture')),
       body: !_taken ? FutureBuilder<void>(
@@ -81,7 +86,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
           } else {
             return const Center(child: CircularProgressIndicator());
           }
-        }) : Text("잘 하고 있어요!"),
+        }) : Text("로딩중...\n오늘 ${_today} 개의 지문을 읽었어요!"),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           try {
@@ -96,20 +101,19 @@ class TakePictureScreenState extends State<TakePictureScreen> {
               _taken = true;
             });
 
-            List resp = await ImageUploader().uploadImage(image.path);
+            resp = await ImageUploader().uploadImage(image.path);
+
+            _showing = resp[foring[dropdownValue]];
 
             setState(() {
-              _loading = false;
-              if (dropdownValue == '요약') {
-                _showing = resp[0];
+              if (DateTime.now().day == _date) {
+                ++_today;
               } else {
-                _showing = resp[0];
-                bold_list = resp[1]!.split(' ');
-                log(bold_list.length.toString());
-                for (String b in bold_list) {
-                  log(b);
-                }
+                _date = DateTime.now().day;
+                _today = 1;
               }
+
+              _loading = false;
             });
 
             await Navigator.of(context).push(
@@ -146,7 +150,7 @@ class ImageUploader {
     http.Response res = await http.Response.fromStream(response);
 
     var data = jsonDecode(res.body);
-    return [data['summary'], data['bold']];
+    return [data['summary'], data['original'], data['oneline']];
   }
 }
 
@@ -166,26 +170,19 @@ class DisplayPictureScreenState extends State<DisplayPictureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Display the Picture')),
-      body: Center(
+      body: SingleChildScrollView(
         child: Column(
           children: <Widget>[
-            _loading ? Text("잘 하고 있어요!") : (
-              dropdownValue == "요약" ?
-                Text("$_showing")
-              : EasyRichText(
-                "$_showing",
-                patternList: bold_list.map<EasyRichTextPattern>((String value) {
-                  return EasyRichTextPattern (
-                    targetString: value,
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  );
-                }).toList(),
-              )
+            _loading ? Text("로딩중...\n오늘 ${_today} 개의 지문을 읽었어요!") : (
+            dropdownValue == "요약" ?
+              Text("$_showing")
+            : Text("$_showing")
             ),
             DropdownButton(
               onChanged: (String? value) {
                 setState(() {
                   dropdownValue = value;
+                  _showing = resp[foring[dropdownValue]];
                 });
               },
               value: dropdownValue,
