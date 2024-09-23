@@ -14,9 +14,9 @@ int _today = 0;
 int _date = 0;
 List resp = ["에러: 로딩이 되지 않았습니다.", "에러: 로딩이 되지 않았습니다."];
 
-const List<String> list = <String>['요약', '원문', '한 줄 요약'];
+const List<String> list = <String>['한 줄 요약', '요약', '원문', '단어 설명'];
 
-Map foring = {'요약': 0, '원문': 1, '한 줄 요약': 2};
+Map foring = {'요약': 0, '원문': 1, '한 줄 요약': 2, '단어 설명': 3};
 
 
 String? dropdownValue = list.first;
@@ -150,7 +150,7 @@ class ImageUploader {
     http.Response res = await http.Response.fromStream(response);
 
     var data = jsonDecode(res.body);
-    return [data['summary'], data['original'], data['oneline']];
+    return [data['summary'], data['original'], data['oneline'], data['meaning']];
   }
 }
 
