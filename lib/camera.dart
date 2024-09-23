@@ -88,7 +88,16 @@ class TakePictureScreenState extends State<TakePictureScreen> {
       // 사진을 찍었다면 로딩메뉴, 찍지 않았다면 카메라 화면
       body: _pictureTaken
           ? (
-            Text("로딩중...\n오늘 $_todayCount 개의 지문을 읽었어요!")
+            Column(
+              children: [
+                Text("로딩중...\n오늘 $_todayCount 개의 지문을 읽었어요!"),
+                Container(
+                  alignment: Alignment.center,
+                  child: CircularProgressIndicator(),
+                )
+              ]
+
+            )
           )
           : FutureBuilder<void>(
             future: _initializeControllerFuture,
