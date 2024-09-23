@@ -4,28 +4,30 @@ import 'dart:developer';
 import 'package:http/http.dart' as http;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:easy_rich_text/easy_rich_text.dart';
 
-bool _loading = true;
-String? _showing;
-bool _taken = false;
-int _today = 0;
+// flag 변수들
+bool _loading = false;
+String? _showingMenu;
+bool _pictureTaken = false;
+String _title = "사진 찍기";
+
+// 칭찬 기능 날짜별로 카운트
+int _todayCount = 0;
 int _date = 0;
-List resp = ["에러: 로딩이 되지 않았습니다.", "에러: 로딩이 되지 않았습니다."];
 
-const List<String> list = <String>['한 줄 요약', '요약', '원문', '단어 설명'];
+List results = ["에러: 로딩이 되지 않았습니다.", "에러: 로딩이 되지 않았습니다."];
 
-Map foring = {'요약': 0, '원문': 1, '한 줄 요약': 2, '단어 설명': 3};
+const List<String> dropdownList = <String>['한 줄 요약', '요약', '원문', '단어 설명'];
 
+// if문을 줄이기 위함
+Map menuJsonMatch = {'요약': 0, '원문': 1, '한 줄 요약': 2, '단어 설명': 3};
 
-String? dropdownValue = list.first;
+String? dropdownValue = dropdownList.first;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final cameras = await availableCameras();
-
   final firstCamera = cameras.first;
 
   runApp(
@@ -46,16 +48,14 @@ class TakePictureScreen extends StatefulWidget {
 
   final CameraDescription camera;
 
-
   @override
   TakePictureScreenState createState() => TakePictureScreenState();
 }
 
 class TakePictureScreenState extends State<TakePictureScreen> {
+  // 카메라 처리
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
-
-
 
   @override
   void initState() {
@@ -75,19 +75,32 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   }
   @override
   Widget build(BuildContext context) {
-
+    log("$_loading $_pictureTaken");
+    setState(() {
+      if (_pictureTaken == false) {
+        _title = "사진 찍기";
+      } else {
+        _title = "불러오는 중...";
+      }
+    });
     return Scaffold(
-      appBar: AppBar(title: const Text('Take a picture')),
-      body: !_taken ? FutureBuilder<void>(
-        future: _initializeControllerFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return CameraPreview(_controller);
-          } else {
-            return const Center(child: CircularProgressIndicator());
-          }
-        }) : Text("로딩중...\n오늘 ${_today} 개의 지문을 읽었어요!"),
+      appBar: AppBar(title: Text("$_title")),
+      // 사진을 찍었다면 로딩메뉴, 찍지 않았다면 카메라 화면
+      body: _pictureTaken
+          ? (
+            Text("로딩중...\n오늘 $_todayCount 개의 지문을 읽었어요!")
+          )
+          : FutureBuilder<void>(
+            future: _initializeControllerFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                return CameraPreview(_controller);
+              } else {
+                return const Center(child: CircularProgressIndicator());
+              }
+            }),
       floatingActionButton: FloatingActionButton(
+        // 촬영 버튼을 누른 후 동작
         onPressed: () async {
           try {
             await _initializeControllerFuture;
@@ -98,22 +111,23 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             log(image.path);
 
             setState(() {
-              _taken = true;
+              _pictureTaken = true;
             });
 
-            resp = await ImageUploader().uploadImage(image.path);
+            // 이미지 업로드 후 요약 등의 결과
+            results = await ImageUploader().uploadImage(image.path);
 
-            _showing = resp[foring[dropdownValue]];
+            _showingMenu = results[menuJsonMatch[dropdownValue]];
 
+            // 칭찬 기능 위해 카운트
             setState(() {
               if (DateTime.now().day == _date) {
-                ++_today;
+                ++_todayCount;
               } else {
                 _date = DateTime.now().day;
-                _today = 1;
+                _todayCount = 1;
               }
-
-              _loading = false;
+              _loading = true;
             });
 
             await Navigator.of(context).push(
@@ -123,10 +137,11 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                 ),
               ),
             );
+            // flag 변수들 재설정
             setState(() {
-              _loading = true;
-              _showing = null;
-              _taken = false;
+              _loading = false;
+              _showingMenu = null;
+              _pictureTaken = false;
             });
           } catch (e) {
             print(e);
@@ -139,8 +154,8 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 }
 
 
-
 class ImageUploader {
+  // 이미지 서버에 업로드 후 response 받아오기
   Future<List> uploadImage(String imagePath) async {
     var url = Uri.parse("http://210.121.159.217:8765/api/literacy");
     var request = http.MultipartRequest('POST', url);
@@ -165,28 +180,24 @@ class DisplayPictureScreen extends StatefulWidget {
 }
 
 class DisplayPictureScreenState extends State<DisplayPictureScreen> {
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Display the Picture')),
+      appBar: AppBar(title: const Text("결과")),
       body: SingleChildScrollView(
         child: Column(
           children: <Widget>[
-            _loading ? Text("로딩중...\n오늘 ${_today} 개의 지문을 읽었어요!") : (
-            dropdownValue == "요약" ?
-              Text("$_showing")
-            : Text("$_showing")
-            ),
+            Text("$_showingMenu"),
+            // 드랍다운 메뉴 설정에 따라 본문 바뀌게 하기
             DropdownButton(
               onChanged: (String? value) {
                 setState(() {
                   dropdownValue = value;
-                  _showing = resp[foring[dropdownValue]];
+                  _showingMenu = results[menuJsonMatch[dropdownValue]];
                 });
               },
               value: dropdownValue,
-              items: list.map<DropdownMenuItem<String>>((String value) {
+              items: dropdownList.map<DropdownMenuItem<String>>((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
                     child: Text(value),
