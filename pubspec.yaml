@@ -44,6 +44,7 @@ dependencies:
   test: ^1.25.2
   flutter_local_notifications: ^17.2.2
   easy_rich_text: ^2.1.0
+  audioplayers: ^6.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

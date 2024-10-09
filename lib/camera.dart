@@ -1,26 +1,37 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 // flag 변수들
 bool _loading = false;
 String? _showingMenu;
 bool _pictureTaken = false;
 String _title = "사진 찍기";
+bool _audioPlaying = false;
 
 // 칭찬 기능 날짜별로 카운트
 int _todayCount = 0;
 int _date = 0;
 
-List results = ["에러: 로딩이 되지 않았습니다.", "에러: 로딩이 되지 않았습니다."];
+
+AudioPlayer audioPlayer = AudioPlayer();
+
+// 요약된 것들
+Map<String, String> results = {'summary': '', 'original': '', 'oneline': '', 'meaning': ''};
+
+// tts 오디오
+Map<String, Uint8List?> tts = {'summary': null, 'original': null, 'oneline': null, 'meaning': null};
 
 const List<String> dropdownList = <String>['한 줄 요약', '요약', '원문', '단어 설명'];
 
 // if문을 줄이기 위함
-Map menuJsonMatch = {'요약': 0, '원문': 1, '한 줄 요약': 2, '단어 설명': 3};
+Map menuJsonMatch = {'요약': 'summary', '원문': 'original', '한 줄 요약': 'oneline', '단어 설명': 'meaning'};
+
 
 String? dropdownValue = dropdownList.first;
 
@@ -29,6 +40,8 @@ Future<void> main() async {
 
   final cameras = await availableCameras();
   final firstCamera = cameras.first;
+
+  audioPlayer.setReleaseMode(ReleaseMode.stop);
 
   runApp(
     MaterialApp(
@@ -77,6 +90,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   Widget build(BuildContext context) {
     log("$_loading $_pictureTaken");
     setState(() {
+      // 타이틀바 설정
       if (_pictureTaken == false) {
         _title = "사진 찍기";
       } else {
@@ -124,7 +138,18 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             });
 
             // 이미지 업로드 후 요약 등의 결과
-            results = await ImageUploader().uploadImage(image.path);
+            var resp = await ImageUploader().uploadImage(image.path);
+            results['summary'] = resp[0];
+            results['original'] = resp[1];
+            results['oneline'] = resp[2];
+            results['meaning'] = resp[3];
+
+            // TTS 전달받은 값 base64 decode 후 저장
+            Map<String, dynamic> ttsEncoded = await gettingTTS(results);
+
+            ttsEncoded.forEach((k,v) {
+              tts[k] = base64.decode(v);
+            });
 
             _showingMenu = results[menuJsonMatch[dropdownValue]];
 
@@ -178,6 +203,28 @@ class ImageUploader {
   }
 }
 
+Future<Map<String, dynamic>> gettingTTS(Map<String, String> texts) async {
+  var url = Uri.parse("http://210.121.159.217:8765/api/literacy-tts");
+
+  var response = await http.post(
+    url,
+    headers: <String, String>{
+    'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: jsonEncode(texts), // 요약 등의 결과값
+  );
+
+  if (response.statusCode == 200) {
+    log('Success!');
+  } else {
+    log('Failed: ${response.statusCode}');
+  }
+  
+  var ttsFiles = jsonDecode(response.body);
+  
+  return ttsFiles;
+}
+
 class DisplayPictureScreen extends StatefulWidget {
   final String imagePath;
 
@@ -193,29 +240,40 @@ class DisplayPictureScreenState extends State<DisplayPictureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("결과")),
-      body: SingleChildScrollView(
-        child: Column(
-          children: <Widget>[
-            Text("$_showingMenu"),
-            // 드랍다운 메뉴 설정에 따라 본문 바뀌게 하기
-            DropdownButton(
-              onChanged: (String? value) {
-                setState(() {
-                  dropdownValue = value;
-                  _showingMenu = results[menuJsonMatch[dropdownValue]];
-                });
-              },
-              value: dropdownValue,
-              items: dropdownList.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-            )
-          ],
+      body: GestureDetector(
+        // 두 번 클릭하면 오디오 재생, 다시 두 번 클릭하면 오디오 정지
+        onDoubleTap: () async {
+          _audioPlaying = !_audioPlaying;
+          if (_audioPlaying) {
+            await audioPlayer.play(BytesSource(tts[menuJsonMatch[dropdownValue]]!));
+          } else {
+            audioPlayer.stop();
+          }
+        },
+        child: SingleChildScrollView(
+          child: Column(
+            children: <Widget>[
+              Text("$_showingMenu"),
+              // 드랍다운 메뉴 설정에 따라 본문 바뀌게 하기
+              DropdownButton(
+                onChanged: (String? value) {
+                  setState(() {
+                    dropdownValue = value;
+                    _showingMenu = results[menuJsonMatch[dropdownValue]];
+                  });
+                },
+                value: dropdownValue,
+                items: dropdownList.map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+              )
+            ],
+          ),
         ),
-      ),
+      )
     );
   }
 }
