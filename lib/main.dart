@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:literacy/camera.dart';
+import 'package:literacy/tutorial.dart';
 
 late List<CameraDescription> cameras;
 late CameraDescription firstCamera;
@@ -67,6 +68,18 @@ class _MyHomePageState extends State<MyHomePage> {
                 },
                 child: const Text(
                   "사진찍기"
+                )
+            ),
+            FilledButton(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(
+                      builder: (context) {
+                        return TutorialScreen();
+                      }
+                  ));
+                },
+                child: const Text(
+                    "앱 사용법"
                 )
             ),
           ],
