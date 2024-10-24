@@ -13,6 +13,7 @@ String? _showingMenu;
 bool _pictureTaken = false;
 String _title = "사진 찍기";
 bool _audioPlaying = false;
+//--------------------------------뒤로가기 눌러도 초기화
 
 // 칭찬 기능 날짜별로 카운트
 int _todayCount = 0;
