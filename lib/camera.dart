@@ -9,7 +9,7 @@ import 'package:audioplayers/audioplayers.dart';
 
 // flag 변수들
 bool _loading = false;
-String? _showingMenu;
+String? _showing;
 bool _pictureTaken = false;
 String _title = "사진 찍기";
 bool _audioPlaying = false;
@@ -18,22 +18,20 @@ bool _audioPlaying = false;
 int _todayCount = 0;
 int _date = 0;
 
+int _level = 5;
+String text = '';
 
 AudioPlayer audioPlayer = AudioPlayer();
 
-// 요약된 것들
-Map<String, String> results = {'summary': '', 'original': '', 'oneline': '', 'meaning': ''};
+String extracted = '';
+
+List<String> structure_text = ['', '', '', '', '', '', '', '', '', ''];
+List<Uint8List?> structure_tts = [null, null, null, null, null, null, null, null, null, null];
 
 // tts 오디오
-Map<String, Uint8List?> tts = {'summary': null, 'original': null, 'oneline': null, 'meaning': null};
-
-const List<String> dropdownList = <String>['한 줄 요약', '요약', '원문', '단어 설명'];
 
 // if문을 줄이기 위함
-Map menuJsonMatch = {'요약': 'summary', '원문': 'original', '한 줄 요약': 'oneline', '단어 설명': 'meaning'};
 
-
-String? dropdownValue = dropdownList.first;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,20 +136,23 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             });
 
             // 이미지 업로드 후 요약 등의 결과
-            var resp = await ImageUploader().uploadImage(image.path);
-            results['summary'] = resp[0];
-            results['original'] = resp[1];
-            results['oneline'] = resp[2];
-            results['meaning'] = resp[3];
+            var ext = await ImageUploader().extractText(image.path);
+            extracted = ext['text'];
+
+            var str = await structureText(extracted, _level);
+
+            structure_text[4] = str['structure'];
+
+            _showing = structure_text[4];
 
             // TTS 전달받은 값 base64 decode 후 저장
-            Map<String, dynamic> ttsEncoded = await gettingTTS(results);
+            Map<String, dynamic> ttsEncoded = await gettingTTS(
+                {'structure': structure_text[4]});
 
             ttsEncoded.forEach((k,v) {
-              tts[k] = base64.decode(v);
+              structure_tts[4] = base64.decode(v);
             });
 
-            _showingMenu = results[menuJsonMatch[dropdownValue]];
 
             // 칭찬 기능 위해 카운트
             setState(() {
@@ -174,7 +175,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             // flag 변수들 재설정
             setState(() {
               _loading = false;
-              _showingMenu = null;
+              _showing = null;
               _pictureTaken = false;
             });
           } catch (e) {
@@ -190,8 +191,8 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 
 class ImageUploader {
   // 이미지 서버에 업로드 후 response 받아오기
-  Future<List> uploadImage(String imagePath) async {
-    var url = Uri.parse("http://210.121.159.217:8765/api/literacy");
+  Future<Map<String, dynamic>> extractText(String imagePath) async {
+    var url = Uri.parse("http://210.121.159.217:8765/api/literacy-extract");
     var request = http.MultipartRequest('POST', url);
     request.files.add(await http.MultipartFile.fromPath('file', imagePath));
 
@@ -199,8 +200,24 @@ class ImageUploader {
     http.Response res = await http.Response.fromStream(response);
 
     var data = jsonDecode(res.body);
-    return [data['summary'], data['original'], data['oneline'], data['meaning']];
+    return data;
   }
+}
+
+Future<Map<String, dynamic>> structureText(String text, int level) async {
+  var url = Uri.parse("http://210.121.159.217:8765/api/literacy-main");
+
+  var response = await http.post(
+    url,
+    headers: <String, String>{
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: jsonEncode({'text': text, 'level': level}),
+  );
+
+  var data = jsonDecode(response.body);
+
+  return data;
 }
 
 Future<Map<String, dynamic>> gettingTTS(Map<String, String> texts) async {
@@ -245,7 +262,7 @@ class DisplayPictureScreenState extends State<DisplayPictureScreen> {
         onDoubleTap: () async {
           _audioPlaying = !_audioPlaying;
           if (_audioPlaying) {
-            await audioPlayer.play(BytesSource(tts[menuJsonMatch[dropdownValue]]!));
+            await audioPlayer.play(BytesSource(structure_tts[_level-1]!));
           } else {
             audioPlayer.stop();
           }
@@ -253,23 +270,56 @@ class DisplayPictureScreenState extends State<DisplayPictureScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: <Widget>[
-              Text("$_showingMenu"),
-              // 드랍다운 메뉴 설정에 따라 본문 바뀌게 하기
-              DropdownButton(
-                onChanged: (String? value) {
+              Text("$_showing"),
+              FilledButton(onPressed: () async {
+                setState(() {
+                  _showing = '로딩중';
+                });
+                _level += 1;
+                if (10 < _level) {
+                  _level = 10;
+                }
+                if (structure_text[_level - 1] != '') {
                   setState(() {
-                    dropdownValue = value;
-                    _showingMenu = results[menuJsonMatch[dropdownValue]];
+                    _showing = structure_text[_level - 1];
                   });
-                },
-                value: dropdownValue,
-                items: dropdownList.map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
-              )
+                } else {
+                  var ext = await structureText(extracted, _level);
+                  var tts = await gettingTTS({"structure": extracted});
+
+                  setState(() {
+                    structure_text[_level-1] = ext['structure'];
+                    structure_tts[_level-1] = base64.decode(tts['structure']);
+
+                    _showing = structure_text[_level-1];
+                  });
+                }
+              }, child: Text("더 길게")),
+              FilledButton(onPressed: () async {
+                setState(() {
+                  _showing = '로딩중';
+                });
+                _level -= 1;
+                if (_level < 1) {
+                  _level = 1;
+                }
+                if (structure_text[_level - 1] != '') {
+                  setState(() {
+                    _showing = structure_text[_level - 1];
+                  });
+                } else {
+                  var ext = await structureText(extracted, _level);
+                  var tts = await gettingTTS({"structure": extracted});
+
+                  setState(() {
+                    structure_text[_level-1] = ext['structure'];
+                    structure_tts[_level-1] = base64.decode(tts['structure']);
+
+                    _showing = structure_text[_level-1];
+                  });
+                }
+              }, child: Text("더 짧게")),
+              // 드랍다운 메뉴 설정에 따라 본문 바뀌게 하기
             ],
           ),
         ),
