@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: '긴 글 요약앱'),
+      home: const MyHomePage(title: '긴 글을 읽기 힘든 사회적 약자들을 위한 앱(이런식으로 바꿔)'),
     );
   }
 }
