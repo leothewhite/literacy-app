@@ -7,7 +7,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
-// flag 변수들
 bool _loading = false;
 String? _showing;
 bool _pictureTaken = false;
@@ -68,7 +67,6 @@ List<String> quotes = quotes = [
   "독서는 인생의 가치를 높인다. - 제임스 볼드윈"
 ];
 
-// 칭찬 기능 날짜별로 카운트
 int _todayCount = 0;
 int _date = 0;
 
@@ -90,11 +88,6 @@ const List<String> dropdownList = <String>['요약', '단어', '해설', '원본
 String? dropdownValue = dropdownList.first;
 
 Uint8List? word_tts = null;
-
-// tts 오디오
-
-// if문을 줄이기 위함
-
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -127,7 +120,6 @@ class TakePictureScreen extends StatefulWidget {
 }
 
 class TakePictureScreenState extends State<TakePictureScreen> {
-  // 카메라 처리
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
 
@@ -156,7 +148,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   Widget build(BuildContext context) {
     log("$_loading $_pictureTaken");
     setState(() {
-      // 타이틀바 설정
       if (_pictureTaken == false) {
         _title = "사진 찍기";
       } else {
@@ -165,7 +156,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     });
     return Scaffold(
       appBar: AppBar(title: Text("$_title")),
-      // 사진을 찍었다면 로딩메뉴, 찍지 않았다면 카메라 화면
       body: _pictureTaken
           ? (
             Column(
@@ -190,7 +180,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
               }
             }),
       floatingActionButton: _pictureTaken == false ? FloatingActionButton(
-        // 촬영 버튼을 누른 후 동작
         onPressed: () async {
           try {
             await _initializeControllerFuture;
@@ -209,7 +198,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
               explain_tts = [null, null, null, null, null, null, null, null, null, null];
             });
 
-            // 이미지 업로드 후 요약 등의 결과
             var ext = await ImageUploader().extractText(image.path);
             extracted = ext['text'];
 
@@ -224,7 +212,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             explain_tts[4] = base64.decode((await gettingTTS(explain[4]))['tts']);
             word_tts = base64.decode((await gettingTTS(words))['tts']);
 
-            // 칭찬 기능 위해 카운트
             setState(() {
               if (DateTime.now().day == _date) {
                 ++_todayCount;
@@ -242,7 +229,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                 ),
               ),
             );
-            // flag 변수들 재설정
             setState(() {
               _loading = false;
               _showing = null;
@@ -253,14 +239,13 @@ class TakePictureScreenState extends State<TakePictureScreen> {
           }
         },
         child: const Icon(Icons.camera_alt),
-      ) : Text('')
+      ) : const Text('')
     );
   }
 }
 
 
 class ImageUploader {
-  // 이미지 서버에 업로드 후 response 받아오기
   Future<Map<String, dynamic>> extractText(String imagePath) async {
     var url = Uri.parse("http://210.121.159.217:8765/api/literacy-extract");
     var request = http.MultipartRequest('POST', url);
@@ -298,7 +283,7 @@ Future<Map<String, dynamic>> gettingTTS(String text) async {
     headers: <String, String>{
     'Content-Type': 'application/json; charset=UTF-8',
     },
-    body: jsonEncode({'text': text}), // 요약 등의 결과값
+    body: jsonEncode({'text': text}),
   );
 
   if (response.statusCode == 200) {
@@ -328,7 +313,6 @@ class DisplayPictureScreenState extends State<DisplayPictureScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text("결과")),
       body: GestureDetector(
-        // 두 번 클릭하면 오디오 재생, 다시 두 번 클릭하면 오디오 정지
         onDoubleTap: () async {
           _audioPlaying = !_audioPlaying;
           if (_audioPlaying) {
@@ -427,7 +411,6 @@ class DisplayPictureScreenState extends State<DisplayPictureScreen> {
                     }
                   });
                 }),
-              // 드랍다운 메뉴 설정에 따라 본문 바뀌게 하기
             ],
           ),
         ),
